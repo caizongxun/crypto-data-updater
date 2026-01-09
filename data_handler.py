@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 import requests
 from config import (
     SYMBOLS, TIMEFRAMES, HF_DATASET_REPO, HF_DATASET_PATH,
-    KLINE_COLUMNS, OPENTIME_COLUMN, CLOSETIME_COLUMN
+    KLINE_COLUMNS, OPENTIME_COLUMN, CLOSETIME_COLUMN,
+    BINANCE_US_BASE_URL, USE_BINANCE_US
 )
 
 class DataHandler:
@@ -13,6 +14,7 @@ class DataHandler:
         self.hf_token = hf_token
         self.symbols = SYMBOLS
         self.timeframes = TIMEFRAMES
+        self.binance_url = BINANCE_US_BASE_URL if USE_BINANCE_US else BINANCE_US_BASE_URL
 
     def fetch_latest_klines(
         self,
@@ -20,8 +22,8 @@ class DataHandler:
         interval: str,
         limit: int = 1000
     ) -> pd.DataFrame:
-        """Fetch latest klines from Binance API"""
-        url = f'https://api.binance.com/api/v3/klines'
+        """Fetch latest klines from Binance US API"""
+        url = f'{self.binance_url}/klines'
         params = {
             'symbol': symbol,
             'interval': interval,
