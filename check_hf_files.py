@@ -1,6 +1,6 @@
 import os
-from huggingface_hub import list_repo_files, hf_hub_url
-from config import HF_DATASET_REPO, SYMBOLS, TIMEFRAMES, HF_DATASET_PATH
+from huggingface_hub import list_repo_files
+from config import HF_DATASET_REPO, SYMBOLS, TIMEFRAMES, HF_DATASET_PATH, get_file_name
 
 def check_hf_files():
     """
@@ -28,7 +28,7 @@ def check_hf_files():
             missing_files[symbol] = []
             
             for timeframe in TIMEFRAMES:
-                file_name = f"{symbol.replace('USDT', '')}_{timeframe}.parquet"
+                file_name = get_file_name(symbol, timeframe)
                 file_path = f"{HF_DATASET_PATH}/{symbol}/{file_name}"
                 
                 if file_path in all_files:
@@ -37,34 +37,34 @@ def check_hf_files():
                     missing_files[symbol].append(timeframe)
         
         print("\nExisting Files:")
-        print("=" * 50)
+        print("=" * 60)
+        existing_count = 0
         for symbol, timeframes in existing_files.items():
             if timeframes:
-                print(f"{symbol}: {', '.join(timeframes)}")
+                print(f"{symbol:12} -> {', '.join(timeframes)}")
+                existing_count += len(timeframes)
         
-        print("\n\nMissing Files (need to be created):")
-        print("=" * 50)
+        print("\n\nMissing Files (will be created on first update):")
+        print("=" * 60)
         missing_count = 0
         for symbol, timeframes in missing_files.items():
             if timeframes:
-                print(f"{symbol}: {', '.join(timeframes)}")
+                print(f"{symbol:12} -> {', '.join(timeframes)}")
                 missing_count += len(timeframes)
         
         print(f"\n\nStatistics:")
-        print("=" * 50)
-        total_existing = sum(len(v) for v in existing_files.values())
-        print(f"Total existing: {total_existing}")
-        print(f"Total missing: {missing_count}")
-        print(f"Total expected: {len(SYMBOLS) * len(TIMEFRAMES)}")
-        print(f"Progress: {total_existing}/{len(SYMBOLS) * len(TIMEFRAMES)}")
+        print("=" * 60)
+        total_expected = len(SYMBOLS) * len(TIMEFRAMES)
+        print(f"Total existing:  {existing_count}/{total_expected}")
+        print(f"Total missing:   {missing_count}/{total_expected}")
+        print(f"Progress:        {existing_count * 100 // total_expected}%")
         
     except Exception as e:
         print(f"Error: {str(e)}")
-        print("\nMake sure:")
-        print("1. Your HF token is correct and has read access")
-        print("2. You have access to the dataset")
-        print("3. The repository is: zongowo111/v2-crypto-ohlcv-data (Dataset, not Model)")
-        print("4. Repository URL: https://huggingface.co/datasets/zongowo111/v2-crypto-ohlcv-data")
+        print("\nTroubleshooting:")
+        print("1. Verify HF token is correct and has read access")
+        print("2. Verify dataset access at: https://huggingface.co/datasets/zongowo111/v2-crypto-ohlcv-data")
+        print("3. Ensure dataset exists and is not private/gated without permission")
 
 if __name__ == "__main__":
     check_hf_files()
