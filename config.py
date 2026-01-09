@@ -11,7 +11,10 @@ TIMEFRAMES = ['15m', '1h']
 HF_DATASET_REPO = 'zongowo111/v2-crypto-ohlcv-data'
 HF_DATASET_PATH = 'klines'
 
+BINANCE_US_BASE_URL = 'https://api.binance.us/api/v3'
 BINANCE_BASE_URL = 'https://api.binance.com/api/v3'
+
+USE_BINANCE_US = True
 
 KLINE_COLUMNS = [
     'open_time',
