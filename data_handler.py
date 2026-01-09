@@ -6,7 +6,7 @@ import requests
 from config import (
     SYMBOLS, TIMEFRAMES, HF_DATASET_REPO, HF_DATASET_PATH,
     KLINE_COLUMNS, OPENTIME_COLUMN, CLOSETIME_COLUMN,
-    BINANCE_US_BASE_URL
+    BINANCE_US_BASE_URL, get_file_name
 )
 
 class DataHandler:
@@ -34,7 +34,7 @@ class DataHandler:
         
         for attempt in range(self.max_retries):
             try:
-                print(f"  Fetching from: {url} with params {params}")
+                print(f"  Fetching from Binance US: {symbol} {interval}")
                 response = requests.get(url, params=params, timeout=15)
                 response.raise_for_status()
                 data = response.json()
@@ -58,13 +58,13 @@ class DataHandler:
                 print(f"  Successfully fetched {len(df)} klines for {symbol} {interval}")
                 return df
             except requests.exceptions.RequestException as e:
-                print(f"  Attempt {attempt + 1}/{self.max_retries} failed for {symbol} {interval}: {str(e)}")
+                print(f"  Attempt {attempt + 1}/{self.max_retries} failed: {str(e)[:100]}")
                 if attempt < self.max_retries - 1:
                     import time
                     time.sleep(self.retry_delay)
                 continue
         
-        print(f"  Error: Failed to fetch klines for {symbol} {interval} after {self.max_retries} attempts")
+        print(f"  Error: Failed to fetch klines after {self.max_retries} attempts")
         return None
 
     def download_from_hf(
@@ -76,10 +76,10 @@ class DataHandler:
         try:
             from huggingface_hub import hf_hub_download
             
-            file_name = f"{symbol.replace('USDT', '')}_{timeframe}.parquet"
+            file_name = get_file_name(symbol, timeframe)
             file_path_str = f"{HF_DATASET_PATH}/{symbol}/{file_name}"
             
-            print(f"  Downloading from HF: {HF_DATASET_REPO}/{file_path_str}")
+            print(f"  Downloading {file_name} from HuggingFace...")
             
             try:
                 file_path = hf_hub_download(
@@ -91,16 +91,16 @@ class DataHandler:
                 )
                 
                 df = pd.read_parquet(file_path)
-                print(f"  Successfully downloaded {symbol} {timeframe} with {len(df)} rows")
+                print(f"  Downloaded: {len(df)} rows")
                 return df
             except Exception as hf_error:
-                if "404" in str(hf_error) or "Repository Not Found" in str(hf_error):
-                    print(f"  Warning: File not found on HF: {file_path_str}")
-                    print(f"  This will be created as new file after first update")
+                error_str = str(hf_error)
+                if "404" in error_str or "not found" in error_str.lower():
+                    print(f"  File not found (will be created on upload)")
                     return None
                 raise
         except Exception as e:
-            print(f"  Error downloading {symbol} {timeframe} from HF: {str(e)}")
+            print(f"  Download error: {str(e)[:100]}")
             return None
 
     def merge_and_deduplicate(
@@ -124,7 +124,7 @@ class DataHandler:
         )
         merged_df = merged_df.sort_values(OPENTIME_COLUMN).reset_index(drop=True)
         
-        print(f"  Merged data: {len(existing_df)} existing + {len(new_df)} new = {len(merged_df)} total rows")
+        print(f"  Merged: {len(existing_df)} existing + {len(new_df)} new = {len(merged_df)} total")
         return merged_df
 
     def validate_data(self, df: Optional[pd.DataFrame]) -> bool:
@@ -148,15 +148,14 @@ class DataHandler:
         self,
         df: pd.DataFrame,
         symbol: str,
-        timeframe: str,
-        private: bool = False
+        timeframe: str
     ) -> bool:
         """Upload updated parquet file to HuggingFace dataset"""
         try:
             import tempfile
             import os
             
-            file_name = f"{symbol.replace('USDT', '')}_{timeframe}.parquet"
+            file_name = get_file_name(symbol, timeframe)
             folder_path = f"{HF_DATASET_PATH}/{symbol}"
             
             with tempfile.TemporaryDirectory() as tmp_dir:
@@ -164,7 +163,7 @@ class DataHandler:
                 df.to_parquet(tmp_file, index=False, compression='snappy')
                 
                 from huggingface_hub import upload_file
-                print(f"  Uploading to HF: {HF_DATASET_REPO}/{folder_path}/{file_name}")
+                print(f"  Uploading {file_name} to HuggingFace...")
                 
                 upload_file(
                     path_or_fileobj=tmp_file,
@@ -172,14 +171,14 @@ class DataHandler:
                     repo_id=HF_DATASET_REPO,
                     repo_type="dataset",
                     token=self.hf_token,
-                    private=private,
+                    private=False,
                     commit_message=f"Update {symbol} {timeframe} at {datetime.now().isoformat()}"
                 )
             
-            print(f"  Successfully uploaded {symbol} {timeframe}")
+            print(f"  Upload successful")
             return True
         except Exception as e:
-            print(f"  Error uploading {symbol} {timeframe} to HF: {str(e)}")
+            print(f"  Upload error: {str(e)[:100]}")
             return False
 
     def process_symbol(
@@ -194,20 +193,20 @@ class DataHandler:
         new_df = self.fetch_latest_klines(symbol, timeframe, limit=1000)
         
         if new_df is None:
-            print(f"FAILED: Could not fetch latest klines for {symbol} {timeframe}")
+            print(f"FAILED: Could not fetch latest klines")
             return False
         
         merged_df = self.merge_and_deduplicate(existing_df, new_df)
         
         if merged_df is None:
-            print(f"FAILED: No data to merge for {symbol} {timeframe}")
+            print(f"FAILED: No data to merge")
             return False
         
         if not self.validate_data(merged_df):
-            print(f"FAILED: Data validation failed for {symbol} {timeframe}")
+            print(f"FAILED: Data validation failed")
             return False
         
-        success = self.upload_to_hf(merged_df, symbol, timeframe, private=False)
+        success = self.upload_to_hf(merged_df, symbol, timeframe)
         if success:
             print(f"SUCCESS: {symbol} {timeframe}")
         return success
