@@ -1,0 +1,7 @@
+pandas==2.1.4
+pyarrow==14.0.1
+huggingface-hub==0.20.1
+requests==2.31.0
+numpy==1.24.3
+binance==6.8.0
+python-dotenv==1.0.0
