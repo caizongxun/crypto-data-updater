@@ -72,7 +72,7 @@ class DataHandler:
         symbol: str,
         timeframe: str
     ) -> Optional[pd.DataFrame]:
-        """Download parquet file from HuggingFace"""
+        """Download parquet file from HuggingFace dataset"""
         try:
             from huggingface_hub import hf_hub_download
             
@@ -85,6 +85,7 @@ class DataHandler:
                 file_path = hf_hub_download(
                     repo_id=HF_DATASET_REPO,
                     filename=file_path_str,
+                    repo_type="dataset",
                     token=self.hf_token,
                     timeout=30
                 )
@@ -150,7 +151,7 @@ class DataHandler:
         timeframe: str,
         private: bool = False
     ) -> bool:
-        """Upload updated parquet file to HuggingFace"""
+        """Upload updated parquet file to HuggingFace dataset"""
         try:
             import tempfile
             import os
@@ -169,6 +170,7 @@ class DataHandler:
                     path_or_fileobj=tmp_file,
                     path_in_repo=f"{folder_path}/{file_name}",
                     repo_id=HF_DATASET_REPO,
+                    repo_type="dataset",
                     token=self.hf_token,
                     private=private,
                     commit_message=f"Update {symbol} {timeframe} at {datetime.now().isoformat()}"
