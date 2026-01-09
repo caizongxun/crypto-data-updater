@@ -12,7 +12,6 @@ HF_DATASET_REPO = 'zongowo111/v2-crypto-ohlcv-data'
 HF_DATASET_PATH = 'klines'
 
 BINANCE_US_BASE_URL = 'https://api.binance.us/api/v3'
-BINANCE_BASE_URL = 'https://api.binance.com/api/v3'
 
 USE_BINANCE_US = True
 
@@ -38,3 +37,11 @@ TIMEFRAME_MAPPING = {
 
 OPENTIME_COLUMN = 'open_time'
 CLOSETIME_COLUMN = 'close_time'
+
+def get_file_name(symbol: str, timeframe: str) -> str:
+    """
+    Generate filename for symbol and timeframe.
+    Example: BTCUSDT + 15m -> BTC_15m.parquet
+    """
+    symbol_short = symbol.replace('USDT', '')
+    return f"{symbol_short}_{timeframe}.parquet"
