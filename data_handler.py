@@ -3,6 +3,7 @@ import numpy as np
 from typing import Tuple, List, Optional
 from datetime import datetime, timedelta
 import requests
+from huggingface_hub import login
 from config import (
     SYMBOLS, TIMEFRAMES, HF_DATASET_REPO, HF_DATASET_PATH,
     KLINE_COLUMNS, OPENTIME_COLUMN, CLOSETIME_COLUMN,
@@ -17,6 +18,13 @@ class DataHandler:
         self.binance_url = BINANCE_US_BASE_URL
         self.max_retries = 3
         self.retry_delay = 1
+        
+        print("Logging in to HuggingFace...")
+        try:
+            login(token=hf_token)
+            print("HuggingFace login successful!\n")
+        except Exception as e:
+            print(f"Warning: HuggingFace login error: {e}\n")
 
     def fetch_latest_klines(
         self,
