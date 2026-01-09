@@ -4,18 +4,21 @@ from config import HF_DATASET_REPO, SYMBOLS, TIMEFRAMES, HF_DATASET_PATH
 
 def check_hf_files():
     """
-    Check which files exist on HuggingFace
+    Check which files exist on HuggingFace dataset
     This helps identify which symbols need initial creation
     """
     hf_token = input("Enter your HuggingFace token: ").strip()
     
-    print(f"\nChecking files in {HF_DATASET_REPO}...\n")
+    print(f"\nChecking files in {HF_DATASET_REPO} (Dataset)...\n")
     
     try:
         all_files = list_repo_files(
             repo_id=HF_DATASET_REPO,
+            repo_type="dataset",
             token=hf_token
         )
+        
+        print(f"Total files found: {len(all_files)}\n")
         
         existing_files = {}
         missing_files = {}
@@ -47,16 +50,21 @@ def check_hf_files():
                 print(f"{symbol}: {', '.join(timeframes)}")
                 missing_count += len(timeframes)
         
-        print(f"\n\nTotal existing: {sum(len(v) for v in existing_files.values())}")
+        print(f"\n\nStatistics:")
+        print("=" * 50)
+        total_existing = sum(len(v) for v in existing_files.values())
+        print(f"Total existing: {total_existing}")
         print(f"Total missing: {missing_count}")
         print(f"Total expected: {len(SYMBOLS) * len(TIMEFRAMES)}")
+        print(f"Progress: {total_existing}/{len(SYMBOLS) * len(TIMEFRAMES)}")
         
     except Exception as e:
         print(f"Error: {str(e)}")
         print("\nMake sure:")
-        print("1. Your HF token is correct")
+        print("1. Your HF token is correct and has read access")
         print("2. You have access to the dataset")
-        print("3. The repository exists")
+        print("3. The repository is: zongowo111/v2-crypto-ohlcv-data (Dataset, not Model)")
+        print("4. Repository URL: https://huggingface.co/datasets/zongowo111/v2-crypto-ohlcv-data")
 
 if __name__ == "__main__":
     check_hf_files()
