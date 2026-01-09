@@ -1,5 +1,4 @@
-import os
-from huggingface_hub import list_repo_files
+from huggingface_hub import HfApi, login
 from config import HF_DATASET_REPO, SYMBOLS, TIMEFRAMES, HF_DATASET_PATH, get_file_name
 
 def check_hf_files():
@@ -9,16 +8,25 @@ def check_hf_files():
     """
     hf_token = input("Enter your HuggingFace token: ").strip()
     
-    print(f"\nChecking files in {HF_DATASET_REPO} (Dataset)...\n")
+    print(f"\nLogging in to HuggingFace...")
+    try:
+        login(token=hf_token)
+        print("Login successful!\n")
+    except Exception as e:
+        print(f"Login error: {e}")
+        return
+    
+    print(f"Checking files in {HF_DATASET_REPO}...\n")
     
     try:
-        all_files = list_repo_files(
-            repo_id=HF_DATASET_REPO,
-            repo_type="dataset",
-            token=hf_token
-        )
+        api = HfApi(token=hf_token)
         
-        print(f"Total files found: {len(all_files)}\n")
+        repo_info = api.repo_info(
+            repo_id=HF_DATASET_REPO,
+            repo_type="dataset"
+        )
+        print(f"Dataset found: {repo_info.repo_id}")
+        print(f"Last modified: {repo_info.last_modified}\n")
         
         existing_files = {}
         missing_files = {}
@@ -31,9 +39,14 @@ def check_hf_files():
                 file_name = get_file_name(symbol, timeframe)
                 file_path = f"{HF_DATASET_PATH}/{symbol}/{file_name}"
                 
-                if file_path in all_files:
+                try:
+                    file_info = api.file_info(
+                        repo_id=HF_DATASET_REPO,
+                        filename=file_path,
+                        repo_type="dataset"
+                    )
                     existing_files[symbol].append(timeframe)
-                else:
+                except:
                     missing_files[symbol].append(timeframe)
         
         print("\nExisting Files:")
@@ -62,9 +75,9 @@ def check_hf_files():
     except Exception as e:
         print(f"Error: {str(e)}")
         print("\nTroubleshooting:")
-        print("1. Verify HF token is correct and has read access")
-        print("2. Verify dataset access at: https://huggingface.co/datasets/zongowo111/v2-crypto-ohlcv-data")
-        print("3. Ensure dataset exists and is not private/gated without permission")
+        print("1. Verify HF token is correct")
+        print("2. Check dataset access at: https://huggingface.co/datasets/zongowo111/v2-crypto-ohlcv-data")
+        print("3. Ensure you have permission to access this dataset")
 
 if __name__ == "__main__":
     check_hf_files()
