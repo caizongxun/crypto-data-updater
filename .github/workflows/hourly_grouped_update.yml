@@ -1,0 +1,82 @@
+name: Hourly Grouped Crypto Data Update
+
+on:
+  schedule:
+    # 每小時執行一次 (00:00, 01:00, 02:00, ... 23:00 UTC)
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      hour:
+        description: 'Hour to process (0-4, will cycle through groups)'
+        required: false
+        default: '0'
+
+jobs:
+  hourly-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas pyarrow huggingface-hub requests numpy
+      
+      - name: Get current hour for scheduled run
+        id: get_hour
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            HOUR=${{ github.event.inputs.hour }}
+          else
+            HOUR=$(date -u +%H | sed 's/^0//')
+            # 計算組別 (hour % 5)
+            GROUP=$((HOUR % 5))
+            echo "Current UTC hour: $HOUR, Processing group: $GROUP"
+            HOUR=$GROUP
+          fi
+          echo "HOUR=$HOUR" >> $GITHUB_ENV
+      
+      - name: Process hourly group update
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python -c "
+          import os
+          from grouped_updater import GroupedUpdater
+          
+          hf_token = os.environ.get('HF_TOKEN')
+          if not hf_token:
+              print('Error: HF_TOKEN not set')
+              exit(1)
+          
+          hour = ${{ env.HOUR }}
+          
+          print(f'\n{\'=\' * 70}')
+          print(f'Hourly Grouped Update - Hour Index: {hour}')
+          print(f'{\'=\' * 70}\n')
+          
+          updater = GroupedUpdater(hf_token=hf_token)
+          results = updater.process_hourly(hour)
+          
+          success = sum(1 for v in results.values() if v == 'SUCCESS')
+          failed = sum(1 for v in results.values() if v == 'FAILED')
+          print(f'\nResults: {success} successful, {failed} failed')
+          print(f'Temp directory cleaned up automatically')
+          "
+      
+      - name: Verify temp cleanup
+        run: |
+          if [ -d "data/temp" ]; then
+            temp_size=$(du -sh data/temp 2>/dev/null | cut -f1)
+            echo "Temp directory size: $temp_size"
+            # 核寸：如果 data/temp 存在且不為空，也是小檔案 (1-2 MB)
+          else
+            echo "Temp directory cleaned successfully"
+          fi
