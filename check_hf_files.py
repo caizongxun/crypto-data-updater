@@ -1,47 +1,32 @@
-import requests
+from huggingface_hub import HfApi, login
 from config import HF_DATASET_REPO, SYMBOLS, TIMEFRAMES, HF_DATASET_PATH, get_file_name
 
 def check_hf_files():
     """
-    Check which files exist on HuggingFace dataset
+    Check which files exist on HuggingFace dataset using HfApi.list_repo_files()
     This helps identify which symbols need initial creation
     """
     hf_token = input("Enter your HuggingFace token: ").strip()
     
-    print(f"\nChecking files in {HF_DATASET_REPO}...\n")
+    print(f"\nLogging in to HuggingFace...")
+    try:
+        login(token=hf_token)
+        print("Login successful!\n")
+    except Exception as e:
+        print(f"Login error: {e}")
+        return
+    
+    print(f"Checking files in {HF_DATASET_REPO}...\n")
     
     try:
-        headers = {
-            "Authorization": f"Bearer {hf_token}"
-        }
+        api = HfApi()
         
-        # 正確的數據集 API 端點
-        url = f"https://huggingface.co/api/datasets/{HF_DATASET_REPO}/tree/main"
-        print(f"Accessing: {url}\n")
-        
-        response = requests.get(url, headers=headers, params={"recursive": True})
-        
-        if response.status_code == 401:
-            print("Error: Invalid or expired HuggingFace token")
-            print("Please generate a new token at: https://huggingface.co/settings/tokens")
-            return
-        elif response.status_code == 404:
-            print("Error: Dataset not found")
-            print(f"Please verify the dataset exists at: https://huggingface.co/datasets/{HF_DATASET_REPO}")
-            return
-        elif response.status_code != 200:
-            print(f"Error: HTTP {response.status_code}")
-            print(response.text)
-            return
-        
-        data = response.json()
-        
-        # 提取所有文件列表
-        all_files = []
-        if "siblings" in data:
-            for item in data["siblings"]:
-                if "rfilename" in item:
-                    all_files.append(item["rfilename"])
+        # Use list_repo_files() with repo_type="dataset"
+        all_files = list(api.list_repo_files(
+            repo_id=HF_DATASET_REPO,
+            repo_type="dataset",
+            token=hf_token
+        ))
         
         print(f"Dataset found: {HF_DATASET_REPO}")
         print(f"Total files: {len(all_files)}\n")
