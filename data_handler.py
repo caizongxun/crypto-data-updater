@@ -90,12 +90,12 @@ class DataHandler:
             print(f"  Downloading {file_name} from HuggingFace...")
             
             try:
+                # Remove 'timeout' parameter for compatibility with older versions
                 file_path = hf_hub_download(
                     repo_id=HF_DATASET_REPO,
                     filename=file_path_str,
                     repo_type="dataset",
-                    token=self.hf_token,
-                    timeout=30
+                    token=self.hf_token
                 )
                 
                 df = pd.read_parquet(file_path)
@@ -173,13 +173,13 @@ class DataHandler:
                 from huggingface_hub import upload_file
                 print(f"  Uploading {file_name} to HuggingFace...")
                 
+                # Remove 'private' parameter for compatibility with older versions
                 upload_file(
                     path_or_fileobj=tmp_file,
                     path_in_repo=f"{folder_path}/{file_name}",
                     repo_id=HF_DATASET_REPO,
                     repo_type="dataset",
                     token=self.hf_token,
-                    private=False,
                     commit_message=f"Update {symbol} {timeframe} at {datetime.now().isoformat()}"
                 )
             
