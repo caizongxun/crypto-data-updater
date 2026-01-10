@@ -36,7 +36,6 @@ jobs:
             HOUR=${{ github.event.inputs.hour }}
           else
             HOUR=$(date -u +%H | sed 's/^0//')
-            # 計算組別 (hour % 5)
             GROUP=$((HOUR % 5))
             echo "Current UTC hour: $HOUR, Processing group: $GROUP"
             HOUR=$GROUP
@@ -47,7 +46,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          python -c "
+          python << 'EOF'
           import os
           from grouped_updater import GroupedUpdater
           
@@ -56,11 +55,12 @@ jobs:
               print('Error: HF_TOKEN not set')
               exit(1)
           
-          hour = ${{ env.HOUR }}
+          hour = int(os.environ.get('HOUR', '0'))
           
-          print(f'\n{\'=\' * 70}')
+          sep = '=' * 70
+          print(f'\n{sep}')
           print(f'Hourly Grouped Update - Hour Index: {hour}')
-          print(f'{\'=\' * 70}\n')
+          print(f'{sep}\n')
           
           updater = GroupedUpdater(hf_token=hf_token)
           results = updater.process_hourly(hour)
@@ -68,15 +68,14 @@ jobs:
           success = sum(1 for v in results.values() if v == 'SUCCESS')
           failed = sum(1 for v in results.values() if v == 'FAILED')
           print(f'\nResults: {success} successful, {failed} failed')
-          print(f'Temp directory cleaned up automatically')
-          "
+          print('Temp directory cleaned up automatically')
+          EOF
       
       - name: Verify temp cleanup
         run: |
           if [ -d "data/temp" ]; then
             temp_size=$(du -sh data/temp 2>/dev/null | cut -f1)
             echo "Temp directory size: $temp_size"
-            # 核寸：如果 data/temp 存在且不為空，也是小檔案 (1-2 MB)
           else
             echo "Temp directory cleaned successfully"
           fi
