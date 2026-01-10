@@ -1,0 +1,104 @@
+name: Update Crypto Data Every 5 Hours
+
+on:
+  schedule:
+    # 每 5 小時執行一次 (00:00, 05:00, 10:00, 15:00, 20:00 UTC)
+    - cron: '0 0,5,10,15,20 * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch-and-cache:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas pyarrow huggingface-hub requests numpy
+      
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      
+      - name: Fetch and cache latest klines
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python -c "
+          from incremental_updater import IncrementalUpdater
+          import os
+          
+          hf_token = os.environ.get('HF_TOKEN')
+          if not hf_token:
+              print('Error: HF_TOKEN not set')
+              exit(1)
+          
+          # Phase 1: 只抓取並存快取 (不上傳到 HF)
+          updater = IncrementalUpdater(hf_token=hf_token)
+          results = updater.process_all(upload_to_hf=False)
+          
+          success = sum(1 for v in results.values() if v == 'SUCCESS')
+          failed = sum(1 for v in results.values() if v == 'FAILED')
+          print(f'Phase 1 - Fetched and cached: {success} files, {failed} failed')
+          "
+      
+      - name: Push cache to GitHub
+        run: |
+          git add data/cache/ || true
+          git commit -m "Cache update: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" || true
+          git push origin main
+
+  batch-upload:
+    needs: fetch-and-cache
+    runs-on: ubuntu-latest
+    # 只在 00:00 和 15:00 UTC 執行批量上傳 (一天 2 次)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.schedule == '0 0 * * *' || github.event.schedule == '0 15 * * *')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas pyarrow huggingface-hub requests numpy
+      
+      - name: Batch upload cached files to HuggingFace
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python -c "
+          from incremental_updater import IncrementalUpdater
+          import os
+          
+          hf_token = os.environ.get('HF_TOKEN')
+          if not hf_token:
+              print('Error: HF_TOKEN not set')
+              exit(1)
+          
+          # Phase 2: 批量上傳 (每 20 個檔案一批，間隔 1 秒)
+          updater = IncrementalUpdater(hf_token=hf_token)
+          results = updater.batch_upload_from_cache(batch_size=20, delay_between_files=1.0)
+          
+          uploaded = sum(1 for v in results.values() if v == 'UPLOADED')
+          failed = sum(1 for v in results.values() if v == 'FAILED')
+          print(f'Phase 2 - Uploaded: {uploaded} files, {failed} failed')
+          "
