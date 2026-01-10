@@ -1,3 +1,5 @@
+import pandas as pd
+
 SYMBOLS = [
     'AAVEUSDT', 'ADAUSDT', 'ALGOUSDT', 'ARBUSDT', 'ATOMUSDT',
     'AVAXUSDT', 'BCHUSDT', 'BNBUSDT', 'BTCUSDT', 'DOGEUSDT',
@@ -42,10 +44,7 @@ TIMEFRAME_MAPPING = {
 OPENTIME_COLUMN = 'open_time'
 CLOSETIME_COLUMN = 'close_time'
 
-# 歷史數據起始時間
-# BTC 在 2013-01-01 開始，但 Binance US 從 2018 開始
-# 使用 2017-08-01 作為開始（Binance 國際版開始時間）
-START_TIMESTAMP = int(pd.Timestamp('2017-08-01').timestamp() * 1000)  # milliseconds
+START_TIMESTAMP = int(pd.Timestamp('2017-08-01').timestamp() * 1000)
 
 def get_file_name(symbol: str, timeframe: str) -> str:
     """
@@ -54,5 +53,3 @@ def get_file_name(symbol: str, timeframe: str) -> str:
     """
     symbol_short = symbol.replace('USDT', '')
     return f"{symbol_short}_{timeframe}.parquet"
-
-import pandas as pd
