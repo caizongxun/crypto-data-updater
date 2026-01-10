@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from datetime import datetime, timedelta
 import requests
 import time
@@ -21,10 +21,8 @@ class HistoricalFetcher:
         self.binance_url = BINANCE_US_BASE_URL
         self.max_retries = 3
         self.retry_delay = 2
-        self.cache_dir = cache_dir
-        self.batch_size = 20  # 每 20 個檔案上傳一次
+        self.batch_size = 20
         
-        # 建立快取目錄
         self.cache_dir = os.path.join(cache_dir, HF_DATASET_PATH)
         os.makedirs(self.cache_dir, exist_ok=True)
         
@@ -36,9 +34,6 @@ class HistoricalFetcher:
             print(f"Warning: HuggingFace login error: {e}\n")
     
     def get_interval_ms(self, timeframe: str) -> int:
-        """
-        Get interval in milliseconds for timeframe.
-        """
         if timeframe == '15m':
             return 15 * 60 * 1000
         elif timeframe == '1h':
@@ -53,10 +48,6 @@ class HistoricalFetcher:
         start_time: int,
         limit: int = 1000
     ) -> Optional[pd.DataFrame]:
-        """
-        Fetch a batch of klines from Binance US API.
-        start_time: milliseconds timestamp
-        """
         url = f'{self.binance_url}/klines'
         params = {
             'symbol': symbol,
@@ -77,7 +68,6 @@ class HistoricalFetcher:
             df[OPENTIME_COLUMN] = pd.to_datetime(df[OPENTIME_COLUMN], unit='ms')
             df[CLOSETIME_COLUMN] = pd.to_datetime(df[CLOSETIME_COLUMN], unit='ms')
             
-            # Convert numeric columns
             numeric_columns = ['open', 'high', 'low', 'close', 'volume',
                              'quote_asset_volume', 'taker_buy_base_asset_volume',
                              'taker_buy_quote_asset_volume']
@@ -95,10 +85,6 @@ class HistoricalFetcher:
         symbol: str,
         interval: str
     ) -> Optional[pd.DataFrame]:
-        """
-        Fetch all historical data from START_TIMESTAMP to now.
-        Loop through batches of 1000 klines.
-        """
         print(f"  Fetching {symbol} {interval} from 2017-08-01 to now...")
         
         all_data = []
@@ -111,7 +97,6 @@ class HistoricalFetcher:
         
         while current_time < now_ms:
             batch_count += 1
-            print(f"    Batch {batch_count}: ", end="", flush=True)
             
             for attempt in range(self.max_retries):
                 try:
@@ -119,30 +104,21 @@ class HistoricalFetcher:
                     
                     if df is None or df.empty:
                         empty_batches += 1
-                        print(f"Empty response")
                         
                         if empty_batches >= max_empty_batches:
-                            print(f"    Reached end of data (consecutive empty batches)")
                             break
                         
                         current_time += interval_ms * 1000
                         break
                     
                     empty_batches = 0
-                    
                     all_data.append(df)
-                    last_time = df[OPENTIME_COLUMN].iloc[-1]
                     current_time = int(df[CLOSETIME_COLUMN].iloc[-1].timestamp() * 1000) + 1
-                    
-                    rows = len(df)
-                    date_str = df[OPENTIME_COLUMN].iloc[-1].strftime('%Y-%m-%d %H:%M')
-                    print(f"{rows} rows up to {date_str}")
                     
                     time.sleep(0.2)
                     break
                     
                 except Exception as e:
-                    print(f"Attempt {attempt + 1} failed: {str(e)[:50]}", flush=True)
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay)
                     continue
@@ -163,20 +139,14 @@ class HistoricalFetcher:
         return combined_df
     
     def validate_data(self, df: Optional[pd.DataFrame]) -> bool:
-        """
-        Validate data integrity.
-        """
         if df is None or df.empty:
             return False
         
         required_columns = KLINE_COLUMNS
         if not all(col in df.columns for col in required_columns):
-            missing = [col for col in required_columns if col not in df.columns]
-            print(f"  Error: Missing columns: {missing}")
             return False
         
         if df[OPENTIME_COLUMN].dtype != 'datetime64[ns]':
-            print(f"  Error: {OPENTIME_COLUMN} is not datetime format")
             return False
         
         return True
@@ -187,10 +157,6 @@ class HistoricalFetcher:
         symbol: str,
         timeframe: str
     ) -> str:
-        """
-        Save parquet file to local cache.
-        Returns: file path
-        """
         file_name = get_file_name(symbol, timeframe)
         symbol_dir = os.path.join(self.cache_dir, symbol)
         os.makedirs(symbol_dir, exist_ok=True)
@@ -198,17 +164,15 @@ class HistoricalFetcher:
         file_path = os.path.join(symbol_dir, file_name)
         df.to_parquet(file_path, index=False, compression='snappy')
         
-        print(f"  Cached to {file_path}")
         return file_path
     
-    def upload_batch_to_hf(self, batch_num: int, cached_files: List[tuple]) -> int:
+    def upload_batch_to_hf(self, batch_num: int, cached_files: List[Tuple]) -> int:
         """
         Upload a batch of cached files to HuggingFace.
         cached_files: list of (symbol, timeframe, file_path) tuples
-        Returns: number of successful uploads
         """
         print(f"\n{'=' * 70}")
-        print(f"Uploading Batch {batch_num} ({len(cached_files)} files) to HuggingFace...")
+        print(f"Batch {batch_num} Upload: {len(cached_files)} files to HuggingFace")
         print(f"{'=' * 70}")
         
         successful = 0
@@ -232,37 +196,34 @@ class HistoricalFetcher:
                 
                 print(" Done")
                 successful += 1
-                time.sleep(0.5)  # 延遲以避免速率限制
+                time.sleep(0.5)
                 
             except Exception as e:
                 print(f" Failed: {str(e)[:60]}")
         
-        print(f"\nBatch {batch_num} Upload Summary: {successful}/{len(cached_files)} successful")
+        print(f"Batch {batch_num}: {successful}/{len(cached_files)} successful\n")
         return successful
     
     def process_symbol(
         self,
         symbol: str,
         timeframe: str
-    ) -> bool:
+    ) -> Tuple[bool, Optional[str]]:
         """
         Process single symbol: fetch all history and save to cache.
+        Returns: (success, file_path)
         """
-        print(f"\nProcessing {symbol} {timeframe}...")
-        
         df = self.fetch_all_history(symbol, timeframe)
         
         if df is None:
-            print(f"FAILED: Could not fetch historical data")
-            return False
+            return False, None
         
         if not self.validate_data(df):
-            print(f"FAILED: Data validation failed")
-            return False
+            return False, None
         
-        self.save_to_cache(df, symbol, timeframe)
-        print(f"SUCCESS: {symbol} {timeframe} ({len(df)} klines)")
-        return True
+        file_path = self.save_to_cache(df, symbol, timeframe)
+        print(f"  Cached to {symbol} {timeframe}")
+        return True, file_path
     
     def process_all(
         self,
@@ -270,8 +231,8 @@ class HistoricalFetcher:
         timeframes: Optional[List[str]] = None
     ) -> dict:
         """
-        Process all symbols and timeframes.
-        Fetch and cache all data, then upload in batches.
+        Phase 1: Fetch all data and cache locally.
+        Phase 2: Upload in batches of 20 files.
         """
         symbols = symbols or SYMBOLS
         timeframes = timeframes or TIMEFRAMES
@@ -280,62 +241,53 @@ class HistoricalFetcher:
         total = len(symbols) * len(timeframes)
         current = 0
         
-        # 清空快取目錄
         if os.path.exists(self.cache_dir):
             shutil.rmtree(self.cache_dir)
         os.makedirs(self.cache_dir, exist_ok=True)
         
         print(f"\n{'=' * 70}")
-        print(f"Phase 1: Fetching historical data for {len(symbols)} symbols")
-        print(f"Total operations: {total}")
-        print(f"Batch upload size: {self.batch_size} files")
+        print(f"PHASE 1: Fetching historical data ({total} files)")
         print(f"{'=' * 70}\n")
         
-        # Phase 1: 抓取所有數據並快取
+        cached_files_list = []  # 用來記錄所有快取的檔案
+        
         for symbol in symbols:
             for timeframe in timeframes:
                 current += 1
                 key = f"{symbol}_{timeframe}"
-                print(f"\n[{current}/{total}] {key}")
-                success = self.process_symbol(symbol, timeframe)
+                print(f"[{current}/{total}] {key}")
+                
+                success, file_path = self.process_symbol(symbol, timeframe)
                 results[key] = "SUCCESS" if success else "FAILED"
+                
+                if success and file_path:
+                    cached_files_list.append((symbol, timeframe, file_path))
         
         # Phase 2: 批量上傳
-        print(f"\n\n{'=' * 70}")
-        print(f"Phase 2: Batch uploading to HuggingFace")
-        print(f"{'=' * 70}\n")
+        print(f"\n{'=' * 70}")
+        print(f"PHASE 2: Batch uploading to HuggingFace")
+        print(f"{'=' * 70}")
+        print(f"Total cached files: {len(cached_files_list)}")
+        print(f"Batch size: {self.batch_size} files per batch\n")
         
-        cached_files = []
         batch_num = 1
-        upload_count = 0
+        total_uploaded = 0
         
-        # 掃描快取目錄並構建檔案列表
-        for symbol in symbols:
-            symbol_dir = os.path.join(self.cache_dir, symbol)
-            if os.path.exists(symbol_dir):
-                for timeframe in timeframes:
-                    file_name = get_file_name(symbol, timeframe)
-                    file_path = os.path.join(symbol_dir, file_name)
-                    if os.path.exists(file_path):
-                        cached_files.append((symbol, timeframe, file_path))
-                        
-                        # 每 20 個檔案上傳一次
-                        if len(cached_files) == self.batch_size:
-                            upload_count += self.upload_batch_to_hf(batch_num, cached_files)
-                            batch_num += 1
-                            cached_files = []
+        for i in range(0, len(cached_files_list), self.batch_size):
+            batch = cached_files_list[i:i + self.batch_size]
+            uploaded = self.upload_batch_to_hf(batch_num, batch)
+            total_uploaded += uploaded
+            batch_num += 1
         
-        # 上傳剩餘檔案
-        if cached_files:
-            upload_count += self.upload_batch_to_hf(batch_num, cached_files)
-        
-        print(f"\n\n{'=' * 70}")
+        # Final summary
+        print(f"\n{'=' * 70}")
         print(f"FINAL SUMMARY")
         print(f"{'=' * 70}")
         success_count = sum(1 for v in results.values() if v == "SUCCESS")
         failed_count = sum(1 for v in results.values() if v == "FAILED")
-        print(f"Fetch Results: {success_count} successful, {failed_count} failed")
-        print(f"Upload Results: {upload_count} files uploaded")
+        print(f"Fetched: {success_count} successful, {failed_count} failed")
+        print(f"Uploaded: {total_uploaded}/{len(cached_files_list)} files")
+        print(f"Data location: https://huggingface.co/datasets/zongowo111/v2-crypto-ohlcv-data")
         print(f"{'=' * 70}\n")
         
         return results
