@@ -1,5 +1,4 @@
-.env
-.DS_Store
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,18 +19,32 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-.venv
-env/
+
+# Virtual environments
 venv/
+env/
 ENV/
 env.bak/
 venv.bak/
-.ipynb_checkpoints/
-*.ipynb
+
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 .DS_Store
-local_data/
-*.parquet
-*.csv
-logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Colab
+.colab-public/
+
+# 快取資料夾KEEP (用於存放待上傳的 parquet 檔案)
+# DO NOT ignore: data/cache/
