@@ -14,12 +14,30 @@ SYMBOLS = [
 
 TIMEFRAMES = ['15m', '1h']
 
+# 分組設定 - 每組 10 個幣種 (最後一組 8 個)
+GROUP_SIZE = 10
+
+# 產生分組
+def get_symbol_groups():
+    """
+    將 38 個幣種分成 4 組 (最後一組 8 個)
+    Group 0: SYMBOLS[0:10]   (AAVEUSDT ~ DOGEUSDT)
+    Group 1: SYMBOLS[10:20]  (DOTUSDT ~ SOLUSDT)
+    Group 2: SYMBOLS[20:30]  (UNIUSDT ~ IMXUSDT)
+    Group 3: SYMBOLS[30:38]  (BATUSDT ~ ENJUSDT)
+    """
+    groups = []
+    for i in range(0, len(SYMBOLS), GROUP_SIZE):
+        groups.append(SYMBOLS[i:i+GROUP_SIZE])
+    return groups
+
+SYMBOL_GROUPS = get_symbol_groups()
+TOTAL_GROUPS = len(SYMBOL_GROUPS)
+
 HF_DATASET_REPO = 'zongowo111/v2-crypto-ohlcv-data'
 HF_DATASET_PATH = 'klines'
 
 BINANCE_US_BASE_URL = 'https://api.binance.us/api/v3'
-
-USE_BINANCE_US = True
 
 KLINE_COLUMNS = [
     'open_time',
@@ -53,3 +71,17 @@ def get_file_name(symbol: str, timeframe: str) -> str:
     """
     symbol_short = symbol.replace('USDT', '')
     return f"{symbol_short}_{timeframe}.parquet"
+
+def get_group_for_hour(hour: int) -> int:
+    """
+    根據小時取得對應的分組
+    hour 0-4 對應 Group 0-4 (然後迴圈)
+    """
+    return hour % TOTAL_GROUPS
+
+def get_symbols_for_hour(hour: int):
+    """
+    根據小時取得該時段要更新的幣種
+    """
+    group_idx = get_group_for_hour(hour)
+    return SYMBOL_GROUPS[group_idx]
