@@ -99,6 +99,8 @@ class HistoricalFetcher:
         now_ms = int(datetime.now().timestamp() * 1000)
         interval_ms = self.get_interval_ms(interval)
         batch_count = 0
+        empty_batches = 0  # 連續空批次計數
+        max_empty_batches = 5  # 如果連續 5 個空批次就停止
         
         while current_time < now_ms:
             batch_count += 1
@@ -109,8 +111,20 @@ class HistoricalFetcher:
                     df = self.fetch_batch(symbol, interval, current_time, limit=1000)
                     
                     if df is None or df.empty:
+                        empty_batches += 1
                         print(f"Empty response")
+                        
+                        # 如果連續空批次超過閾值，停止
+                        if empty_batches >= max_empty_batches:
+                            print(f"    Reached end of data (consecutive empty batches)")
+                            break
+                        
+                        # 單個空批次，跳過向前進行
+                        current_time += interval_ms * 1000  # 跳過 1000 個 K 線時間
                         break
+                    
+                    # 重置空批次計數
+                    empty_batches = 0
                     
                     all_data.append(df)
                     last_time = df[OPENTIME_COLUMN].iloc[-1]
@@ -129,6 +143,10 @@ class HistoricalFetcher:
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay)
                     continue
+            
+            # 如果連續空批次達到上限，停止
+            if empty_batches >= max_empty_batches:
+                break
         
         if not all_data:
             print(f"  ERROR: Failed to fetch any data for {symbol} {interval}")
