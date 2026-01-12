@@ -12,7 +12,7 @@ SYMBOLS = [
     'KAVAUSDT', 'ZRXUSDT', 'ENJUSDT'
 ]
 
-TIMEFRAMES = ['15m', '1h']
+TIMEFRAMES = ['15m', '1h', '1d']
 
 # 分組設定 - 每組 10 個幣種 (最後一組 8 個)
 GROUP_SIZE = 10
@@ -56,7 +56,8 @@ KLINE_COLUMNS = [
 
 TIMEFRAME_MAPPING = {
     '15m': '15m',
-    '1h': '1h'
+    '1h': '1h',
+    '1d': '1d'
 }
 
 OPENTIME_COLUMN = 'open_time'
@@ -68,6 +69,7 @@ def get_file_name(symbol: str, timeframe: str) -> str:
     """
     Generate filename for symbol and timeframe.
     Example: BTCUSDT + 15m -> BTC_15m.parquet
+    Example: BTCUSDT + 1d -> BTC_1d.parquet
     """
     symbol_short = symbol.replace('USDT', '')
     return f"{symbol_short}_{timeframe}.parquet"
