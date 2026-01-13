@@ -1,0 +1,60 @@
+========================================
+AI 提示快速參考卡
+========================================
+
+【直接複製下面給 AI】
+
+我有一個加密貨幣 K 線資料集在 HuggingFace：
+
+資料集 ID: zongowo111/v2-crypto-ohlcv-data
+
+結構規則:
+- 根路徑: klines/
+- 檔案格式: klines/{SYMBOL}/{BASE}_{TIMEFRAME}.parquet
+- 例子: klines/BTCUSDT/BTC_1h.parquet
+
+支援的幣種 (38 個):
+AA VEUSDT, ADAUSDT, ALGOUSDT, ARBUSDT, ATOMUSDT,
+AVAXUSDT, BALUSDT, BATUSDT, BCHUSDT, BNBUSDT,
+BTCUSDT, COMPUSDT, CRVUSDT, DOGEUSDT, DOTUSDT,
+ENJUSDT, ENSUSDT, ETCUSDT, ETHUSDT, FILUSDT,
+GALAUSDT, GRTUSDT, IMXUSDT, KAVAUSDT, LINKUSDT,
+LTCUSDT, MANAUSDT, MATICUSDT, MKRUSDT, NEARUSDT,
+OPUSDT, SANDUSDT, SNXUSDT, SOLUSDT, SPELLUSDT,
+UNIUSDT, XRPUSDT, ZRXUSDT
+
+時框: 15m, 1h, 1d
+
+Parquet 欄位:
+open_time, open, high, low, close, volume, close_time,
+quote_asset_volume, number_of_trades,
+taker_buy_base_asset_volume, taker_buy_quote_asset_volume, ignore
+
+讀取範例 Python:
+
+from huggingface_hub import hf_hub_download
+import pandas as pd
+
+def load_klines(symbol: str, timeframe: str):
+    base = symbol.replace("USDT", "")
+    filename = f"{base}_{timeframe}.parquet"
+    path = f"klines/{symbol}/{filename}"
+    local = hf_hub_download(
+        repo_id="zongowo111/v2-crypto-ohlcv-data",
+        filename=path,
+        repo_type="dataset"
+    )
+    return pd.read_parquet(local)
+
+# 用法
+df = load_klines("BTCUSDT", "1h")
+
+========================================
+
+可在此基礎上添加你的具體需求，如：
+- "請分析 BTC 1h 資料的 RSI 指標"
+- "比較 ETH 和 SOL 的相關性"
+- "使用 1d 資料回測均線策略"
+等等
+
+========================================
